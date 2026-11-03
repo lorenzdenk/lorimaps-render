@@ -519,7 +519,7 @@ import csv as _csv
 trees_out = mapnik_dir / "own_big_trees.csv"
 POI_ART = {  # Art -> (symbol, label colour, label offset)
     "Riesenbaum": ("big_tree_star.svg", "#5a3d00", 11),
-    "Triangle": ("triangle_red.svg", "#7a0c0c", 13),
+    "Triangle": ("triangle_red.svg", "#7a0c0c", 11),
     "Wasserfall": ("waterfall_blue.svg", "#0b3d7a", 13),
 }
 with open(here / "pois" / "tasmanien_baeume.csv", encoding="utf-8-sig", newline="") as f_in, open(trees_out, "w", newline="", encoding="utf-8") as f_out:
