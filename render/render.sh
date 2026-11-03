@@ -18,6 +18,8 @@ USER="${USER:-$(id -un)}"   # not set in Docker
 source "$HERE/region.env"
 export TASVEG="${TASVEG:-0}"
 export OVERLAYS="${OVERLAYS:-}" LIST_PLUS="${LIST_PLUS:-0}" LIST_HYDRO="${LIST_HYDRO:-0}"   # with the walks overlay, giant trees and camp sites move from the map into it
+# ONLY_OVERLAYS="walks": render only these overlays, no base map (the base map of an earlier run stays)
+[ -n "${ONLY_OVERLAYS:-}" ] && export OVERLAYS="$ONLY_OVERLAYS"
 WORK="${WORK:-$HOME/work}"
 OTM="$WORK/OpenTopoMap"
 DEM="$OTM/mapnik/dem"
@@ -402,10 +404,14 @@ else
   if [ -n "${FILL_SKIP:-}" ]; then
     FILL_ARGS="--skip $FILL_SKIP --limit ${FILL_LIMIT:-0}"; PART=".fill$SHARD-$FILL_SKIP"; OVERLAYS=""
   fi
+  if [ -n "${ONLY_OVERLAYS:-}" ]; then
+    echo "ONLY_OVERLAYS=$ONLY_OVERLAYS: base map not rendered"
+  else
   python3 "$HERE/render_tiles.py" --shard "${SHARD:-0}" --shards "${SHARDS:-1}" \
     --style opentopomap.xml --out "$OUT/$NAME-otm$PART.mbtiles" \
     --bbox "$BBOX" --minzoom "$MINZOOM" --maxzoom "$MAXZOOM" --scale "$SCALE" --magnify "${MAGNIFY:-1}" \
     --name "$TITLE" --processes "$(nproc)" --format "${TILE_FORMAT:-png8:m=h}" $LAND_ARGS $BASE_DEADLINE $FILL_ARGS
+  fi
 fi
 
   # transparent overlays (MBTiles type=overlay), selectable in the app's map menu
