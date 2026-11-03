@@ -1,0 +1,47 @@
+layer 26: LIST Land Tenure ['OBJECTID', 'TEN_CLASS', 'ACT', 'FEAT_NAME', 'LIST_GUID', 'SHAPE', 'SHAPE.AREA', 'SHAPE.LEN']
+layer 26 (land_tenure): 1/399 cells, 0 features, 0.0 min
+layer 26 (land_tenure): 41/399 cells, 607 features, 0.3 min
+layer 26 (land_tenure): 81/399 cells, 796 features, 0.3 min
+layer 26 (land_tenure): 121/399 cells, 1589 features, 0.8 min
+layer 26 (land_tenure): 161/399 cells, 4872 features, 1.8 min
+layer 26 (land_tenure): 201/399 cells, 9466 features, 1.8 min
+layer 26 (land_tenure): 241/399 cells, 15071 features, 2.4 min
+layer 26 (land_tenure): 281/399 cells, 27480 features, 3.4 min
+layer 26 (land_tenure): 321/399 cells, 40306 features, 4.6 min
+layer 26 (land_tenure): 361/399 cells, 45820 features, 4.6 min
+layer 26 (land_tenure): 46927 features in 4.6 min
+TEN_CLASS,n
+Private Freehold,19940
+Authority Freehold,4327
+Casement,4036
+Crown Land,3228
+Local Government,2719
+Public Reserve,2593
+Inland Water,1829
+Conservation Covenant,1437
+Local Government Act Reserve,1313
+Conservation Area,1290
+Authority Crown,777
+Permanent Timber Production Zone Land,705
+Tas Water,613
+National Park,546
+Future Potential Production Forest (Crown),406
+Nature Reserve,234
+Hydro-Electric Corporation,204
+Regional Reserve,195
+State Reserve,130
+Nature Recreation Area,81
+Commonwealth,71
+Tas Irrigation,43
+Private Sanctuary,41
+Historic Site,40
+HEC Conservation Area,30
+Private Nature Reserve,29
+Future Potential Production Forest (HEC),27
+Game Reserve,26
+LGA Conservation Area,16
+Wellington Park,1
+total 49244
+drwxr-xr-x  2 runner runner     4096 Nov  3 11:04 .
+drwxr-xr-x 11 runner runner     4096 Nov  3 10:58 ..
+-rw-r--r--  1 runner runner 50415064 Nov  3 11:04 list_land_tenure.gpkg.xz
