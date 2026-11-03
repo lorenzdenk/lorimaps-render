@@ -1,0 +1,17 @@
+render jobs: success
+merging tasmania-z17-tenure: 10 of 10 parts
+merged parts/tasmania-z17-tenure.part0.mbtiles
+merged parts/tasmania-z17-tenure.part1.mbtiles
+merged parts/tasmania-z17-tenure.part2.mbtiles
+merged parts/tasmania-z17-tenure.part3.mbtiles
+merged parts/tasmania-z17-tenure.part4.mbtiles
+merged parts/tasmania-z17-tenure.part5.mbtiles
+merged parts/tasmania-z17-tenure.part6.mbtiles
+merged parts/tasmania-z17-tenure.part7.mbtiles
+merged parts/tasmania-z17-tenure.part8.mbtiles
+merged parts/tasmania-z17-tenure.part9.mbtiles
+out/tasmania-z17-tenure.mbtiles: 130474 tiles, 61979 unique images, 283.9 MB
+total 277216
+drwxr-xr-x 2 runner root        4096 Nov  3 12:35 .
+drwxr-xr-x 4 root   root        4096 Nov  3 12:35 ..
+-rw-r--r-- 1 runner runner 283860992 Nov  3 12:35 tasmania-z17-tenure.mbtiles
