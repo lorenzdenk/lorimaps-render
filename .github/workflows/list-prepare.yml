@@ -1,5 +1,5 @@
 name: Prepare LIST data
-# Downloads LIST contours (10 m), hydrographic lines and areas for all of Tasmania once and publishes them as
+# Downloads LIST contours (10 m), hydrographic lines and areas, land tenure for all of Tasmania once and publishes them as
 # release "list-data" (list_<name>.gpkg.xz, EPSG:3857), so render jobs do not each load them from theLIST.
 on:
   push:
@@ -19,18 +19,39 @@ jobs:
       - name: Install
         run: sudo apt-get update -qq && sudo apt-get install -y -qq gdal-bin xz-utils
       - name: Download and convert
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p logs data
           set -o pipefail
-          python3 tools/prepare_list_data.py data \
+          # only the layers not yet in the release (delete an asset there to load it again)
+          have=$(gh release view list-data -R "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' 2>/dev/null || true)
+          specs=()
+          for spec in \
             "23:hydro_lines:HYDLNTY1,HYDLNTY2,HYD_CLASS,NAME" \
             "22:hydro_areas:HYDARTY1,HYDARTY2,HYD_CLASS,NAME,PERENNIAL:HYDARTY1 IN ('Water Body','Watercourse','Estuary','Dam')" \
-            "16:contours:ELEVATION" 2>&1 | tee logs/list-prepare.log
+            "16:contours:ELEVATION" \
+            "26:land_tenure:TEN_CLASS"; do
+            n=$(echo "$spec" | cut -d: -f2)
+            echo "$have" | grep -qx "list_$n.gpkg.xz" && { echo "list_$n already there"; continue; }
+            specs+=("$spec")
+          done
+          # field list of the land tenure layer (for checking)
+          curl -s -m 120 "https://services.thelist.tas.gov.au/arcgis/rest/services/Public/OpenDataWFS/MapServer/26?f=json" \
+            | python3 -c "import json,sys; d=json.load(sys.stdin); print('layer 26:', d.get('name'), [f['name'] for f in d.get('fields', [])])" \
+            | tee -a logs/list-prepare.log || true
+          [ ${#specs[@]} -gt 0 ] || { echo "nothing to do"; exit 0; }
+          python3 tools/prepare_list_data.py data "${specs[@]}" 2>&1 | tee -a logs/list-prepare.log
           cd data
-          for n in hydro_lines hydro_areas contours; do
-            ogr2ogr -f GPKG "list_$n.gpkg" "GeoJSONSeq:$n.geojsonl" -nln "$n" -t_srs EPSG:3857 -lco SPATIAL_INDEX=YES \
-              $( [ $n = hydro_areas ] && echo -makevalid ) 2>&1 | tail -3 | tee -a ../logs/list-prepare.log
-            rm "$n.geojsonl"
+          for f in *.geojsonl; do
+            n=${f%.geojsonl}
+            ogr2ogr -f GPKG "list_$n.gpkg" "GeoJSONSeq:$f" -nln "$n" -t_srs EPSG:3857 -lco SPATIAL_INDEX=YES \
+              $( [ $n = hydro_areas ] || [ $n = land_tenure ] && echo -makevalid ) 2>&1 | tail -3 | tee -a ../logs/list-prepare.log
+            rm "$f"
+            if [ $n = land_tenure ]; then
+              ogr2ogr -f CSV /vsistdout/ "list_$n.gpkg" -dialect SQLite \
+                -sql "SELECT TEN_CLASS, COUNT(*) AS n FROM land_tenure GROUP BY TEN_CLASS ORDER BY n DESC" | tee -a ../logs/list-prepare.log || true
+            fi
             xz -T0 -6 "list_$n.gpkg"
           done
           ls -la | tee -a ../logs/list-prepare.log
@@ -40,6 +61,7 @@ jobs:
         run: |
           gh release view list-data -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 || gh release create list-data -R "$GITHUB_REPOSITORY" \
             --latest=false -t "LIST data (contours, rivers, lakes)" -n "theLIST OpenDataWFS layers 16, 22, 23, © State of Tasmania, CC BY 3.0 AU"
+          ls data/*.gpkg.xz >/dev/null 2>&1 || exit 0
           gh release upload list-data data/*.gpkg.xz -R "$GITHUB_REPOSITORY" --clobber
       - name: Publish log
         if: always()
