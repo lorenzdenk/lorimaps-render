@@ -12,7 +12,7 @@ nr;pattern;lon;lat;radius_km
 11;Lake Esperance;146.772;-43.226;3
 12;Hartz Peak;146.770;-43.220;4
 13;Airwalk|Tahune;146.725;-43.098;3
-14;Lady Barron;146.680;-42.680;4
+14;Lady Barron Falls|Horseshoe Falls;146.680;-42.680;4
 15;Russell Falls;146.710;-42.675;2
 16;Tall Trees;146.700;-42.680;3
 17;Pandani Grove;146.580;-42.685;3
@@ -36,7 +36,7 @@ nr;pattern;lon;lat;radius_km
 35;@walks;145.9213;-41.0802;0.6
 36;Leven Canyon Lookout;146.010;-41.390;3
 37;Alum Cliffs;146.430;-41.530;3
-38;Springlawn;146.600;-41.150;5
+38;Archers Knob;146.600;-41.150;5
 39;@walks;147.2072;-41.3023;0.8
 40;Duck Reach;147.100;-41.450;3
 41;Tamar Island;147.080;-41.380;3

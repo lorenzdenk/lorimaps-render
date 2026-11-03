@@ -29,10 +29,12 @@ psql -q -v ON_ERROR_STOP=1 -d gis <<SQL
 DROP TABLE IF EXISTS gsw_walks, gsw_spec, gsw_tracks, gsw_manual;
 CREATE TABLE gsw_walks (nr text, name text, level text, time text, distance text, search text);
 \copy gsw_walks FROM '$HERE/gsw_walks.csv' WITH (FORMAT csv, DELIMITER ';', HEADER true)
--- length from the booklet in metres (first number: "3,7 km einfach", "600 m", "2–5,4 km" -> 2000)
+-- length of the walk in metres (first number: "7,4 km hin+zurück", "600 m", "2,4 km hin+zurück / 4 km Rundweg" -> 2400)
 ALTER TABLE gsw_walks ADD COLUMN metres float;
 UPDATE gsw_walks SET metres = (SELECT replace(m[1], ',', '.')::float * CASE WHEN m[2] = 'km' THEN 1000 ELSE 1 END
                                  FROM regexp_match(distance, '([0-9]+(?:,[0-9]+)?)[^0-9]*?\s*(km|m)\M') m);
+-- "hin+zurück" (there and back): the track itself is half as long
+UPDATE gsw_walks SET metres = metres / 2 WHERE distance ~ 'hin\+zurück' OR (distance !~ 'Rundweg' AND time ~ '^[^/]*hin\+zurück');
 CREATE TABLE gsw_spec (nr text, pattern text, lon float, lat float, radius_km float);
 \copy gsw_spec FROM '$HERE/gsw_spec.csv' WITH (FORMAT csv, DELIMITER ';', HEADER true)
 ALTER TABLE gsw_spec ADD COLUMN centre geometry, ADD COLUMN radius float, ADD COLUMN circle geometry;
@@ -54,6 +56,10 @@ CREATE TABLE gsw_osm AS
    WHERE COALESCE((SELECT sum(ST_Length(l.way) * cos(radians(s.lat))) FROM gsw_list l WHERE l.nr = s.nr), 0)
          < 0.4 * COALESCE(w.metres, 0) + 1;
 DELETE FROM gsw_osm WHERE way IS NULL OR GeometryType(way) <> 'LINESTRING';
+-- OSM lines along a LIST line of the same walk: not twice
+DELETE FROM gsw_osm o
+ WHERE (SELECT ST_Length(ST_Intersection(o.way, ST_Buffer(ST_Collect(l.way), 30)))
+          FROM gsw_list l WHERE l.nr = o.nr AND ST_DWithin(l.way, o.way, 30)) > 0.6 * ST_Length(o.way);
 SQL
 if [ -f "$HERE/gsw_manual.geojson" ]; then
   ogr2ogr -f PostgreSQL PG:dbname=gis "$HERE/gsw_manual.geojson" -nln gsw_manual -overwrite -t_srs EPSG:3857 \

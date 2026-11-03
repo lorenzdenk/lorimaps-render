@@ -588,9 +588,9 @@ if LIST in ("A", "B", "C", "D"):
       UNION ALL SELECT way FROM planet_osm_line WHERE {PATHLIKE} AND NOT COALESCE(list_dup, false)) AS walks""")
 else:
     WALK_SQL = one_line(f"(SELECT way FROM planet_osm_line WHERE {PATHLIKE}) AS walks")
-GSW_SQL = one_line("""(SELECT way, nr, name, nr || ' ' || name || '  · Level ' || level || ' · ' || time || ' · ' || distance AS label FROM gsw_tracks) AS gsw""")
+GSW_SQL = one_line("""(SELECT way, nr, name, nr || ' ' || name || '  · Grade ' || level || ' · ' || time || ' · ' || distance AS label FROM gsw_tracks) AS gsw""")
 GSW_START_SQL = one_line("""(SELECT DISTINCT ON (nr) ST_StartPoint(ST_GeometryN(way, 1)) AS way, nr, name,
-  'Level ' || level || ' · ' || time || ' · ' || distance AS info FROM gsw_tracks ORDER BY nr, ST_Length(ST_GeometryN(way, 1)) DESC) AS gsws""")
+  'Grade ' || level || ' · ' || time || ' · ' || distance AS info FROM gsw_tracks ORDER BY nr, ST_Length(ST_GeometryN(way, 1)) DESC) AS gsws""")
 BTH_SQL = "(SELECT way, name FROM bigtree_hikes) AS bth"
 GSW_COL, BTH_COL, WALK_COL = "#e8590c", "#7b2fa8", "#d6336c"
 walks_xml = OVERLAY_HEAD + f"""
