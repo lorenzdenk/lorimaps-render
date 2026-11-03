@@ -651,7 +651,7 @@ if TASVEG:
     print("written: overlay-walkability.xml")
 
 # ---------------------------------------------------------------- access overlay from LIST land tenure (OVERLAYS contains "tenure")
-# Colour per tenure class (where camping is allowed), labels "500 m" / "Reserve" on a grid all over the areas.
+# Colour per tenure class (where camping is allowed), opaque (the app sets the opacity of each overlay), labels "500 m" / "Reserve" on a grid all over the areas.
 # LIST Land Tenure (theLIST, layer 26, (c) State of Tasmania, CC BY 3.0 AU)
 if "tenure" in os.environ.get("OVERLAYS", "").split():
     TENURE = {  # TEN_CLASS -> (colour, label)
@@ -668,9 +668,12 @@ if "tenure" in os.environ.get("OVERLAYS", "").split():
     }  # all other classes grey (#9e9e9e), "Inland Water" not drawn
     q = lambda v: "'" + v.replace("'", "''") + "'"
     col_case = "CASE ten_class " + " ".join(f"WHEN {q(k)} THEN {q(c)}" for k, (c, _) in TENURE.items()) + " ELSE '#9e9e9e' END"
+    # boundary lines a little darker than the fill, so neighbouring areas of the same class stay apart
+    dark = lambda c: "#" + "".join(f"{int(int(c[i:i + 2], 16) * 0.72):02x}" for i in (1, 3, 5))
+    line_case = "CASE ten_class " + " ".join(f"WHEN {q(k)} THEN {q(dark(c))}" for k, (c, _) in TENURE.items()) + f" ELSE {q(dark('#9e9e9e'))} END"
     lbl_case = "CASE ten_class " + " ".join(f"WHEN {q(k)} THEN {q(l)}" for k, (c, l) in TENURE.items() if l) + " ELSE '' END"
     # cut to the tile (with margin) and simplified to half a pixel: the large parks have hundreds of thousands of points
-    TEN_SQL = one_line(f"""(SELECT {col_case} AS col,
+    TEN_SQL = one_line(f"""(SELECT {col_case} AS col, {line_case} AS line,
       ST_SimplifyPreserveTopology(ST_ClipByBox2D(way, ST_Expand(!bbox!, 64 * !pixel_width!)), !pixel_width! / 2) AS way
       FROM list_tenure WHERE ten_class <> 'Inland Water' AND way && !bbox!) AS ten""")
     # labels on a global grid (every TEN_GRID output pixels, the same points in neighbouring tiles, so labels
@@ -684,7 +687,7 @@ if "tenure" in os.environ.get("OVERLAYS", "").split():
        WHERE ST_Within(ST_Expand(g.pt, {TEN_HALF_W} * !pixel_width!, {TEN_HALF_H} * !pixel_width!), t.way)) AS tenl""")
     tenure_xml = OVERLAY_HEAD + f"""
 <Style name="ov-tenure">
-<Rule><PolygonSymbolizer fill="[col]" fill-opacity="0.32"/><LineSymbolizer stroke="[col]" stroke-opacity="0.85" stroke-width="0.5"/></Rule>
+<Rule><PolygonSymbolizer fill="[col]"/><LineSymbolizer stroke="[line]" stroke-width="0.4"/></Rule>
 </Style>
 <Style name="ov-tenure-labels">
 <Rule>&maxscale_zoom9;<TextSymbolizer fontset-name="sans-condensed-bold" size="9" fill="#ffffff" halo-radius="1.6" halo-fill="rgba(30,30,30,0.85)"
