@@ -649,3 +649,50 @@ if TASVEG:
 """ + layer("ov-walkability", ["ov-walkability"], HATCH_SQL) + "\n</Map>\n"
     (mapnik_dir / "overlay-walkability.xml").write_text(walkability_xml)
     print("written: overlay-walkability.xml")
+
+# ---------------------------------------------------------------- access overlay from LIST land tenure (OVERLAYS contains "tenure")
+# Colour per tenure class (where camping is allowed), labels "500 m" / "Reserve" on a grid all over the areas.
+# LIST Land Tenure (theLIST, layer 26, (c) State of Tasmania, CC BY 3.0 AU)
+if "tenure" in os.environ.get("OVERLAYS", "").split():
+    TENURE = {  # TEN_CLASS -> (colour, label)
+        "Permanent Timber Production Zone Land": ("#1a9850", ""), "Public Reserve": ("#1a9850", ""),
+        "Conservation Area": ("#a6d96a", "500 m"), "Regional Reserve": ("#a6d96a", "500 m"),
+        "Nature Recreation Area": ("#a6d96a", "500 m"), "Game Reserve": ("#a6d96a", "500 m"),
+        "HEC Conservation Area": ("#a6d96a", "500 m"), "State Reserve": ("#a6d96a", "500 m"),
+        "Nature Reserve": ("#a6d96a", "500 m"), "Historic Site": ("#a6d96a", "500 m"),
+        "National Park": ("#7b3294", "500 m"),
+        "Local Government": ("#fdae61", ""), "Local Government Act Reserve": ("#fdae61", ""), "LGA Conservation Area": ("#fdae61", ""),
+        "Private Sanctuary": ("#d73027", "Reserve"), "Private Nature Reserve": ("#d73027", "Reserve"),
+        "Conservation Covenant": ("#d73027", "Reserve"), "Private Freehold": ("#d73027", ""),
+        "Authority Freehold": ("#d73027", ""), "Tas Water": ("#d73027", ""), "Tas Irrigation": ("#d73027", ""),
+    }  # all other classes grey (#9e9e9e), "Inland Water" not drawn
+    q = lambda v: "'" + v.replace("'", "''") + "'"
+    col_case = "CASE ten_class " + " ".join(f"WHEN {q(k)} THEN {q(c)}" for k, (c, _) in TENURE.items()) + " ELSE '#9e9e9e' END"
+    lbl_case = "CASE ten_class " + " ".join(f"WHEN {q(k)} THEN {q(l)}" for k, (c, l) in TENURE.items() if l) + " ELSE '' END"
+    # cut to the tile (with margin) and simplified to half a pixel: the large parks have hundreds of thousands of points
+    TEN_SQL = one_line(f"""(SELECT {col_case} AS col,
+      ST_SimplifyPreserveTopology(ST_ClipByBox2D(way, ST_Expand(!bbox!, 64 * !pixel_width!)), !pixel_width! / 2) AS way
+      FROM list_tenure WHERE ten_class <> 'Inland Water' AND way && !bbox!) AS ten""")
+    # labels on a global grid (every TEN_GRID output pixels, the same points in neighbouring tiles, so labels
+    # cut at a tile edge continue in the next tile); only where the whole label fits into the area
+    # 3 x 3 labels per 512 px tile; the grid starts at a tile corner, so tiles inside large areas are identical
+    # (stored once in the MBTiles)
+    TEN_GRID, TEN_HALF_W, TEN_HALF_H = 512 / 3, 62, 22
+    TEN_LBL_SQL = one_line(f"""(WITH t AS (SELECT {lbl_case} AS lbl, way FROM list_tenure WHERE way && !bbox!),
+      g AS (SELECT ST_Centroid((ST_SquareGrid({TEN_GRID} * !pixel_width!, ST_Expand(!bbox!, {TEN_GRID} * !pixel_width!))).geom) AS pt)
+      SELECT t.lbl, g.pt AS way FROM g JOIN t ON t.lbl <> '' AND ST_Intersects(t.way, g.pt)
+       WHERE ST_Within(ST_Expand(g.pt, {TEN_HALF_W} * !pixel_width!, {TEN_HALF_H} * !pixel_width!), t.way)) AS tenl""")
+    tenure_xml = OVERLAY_HEAD + f"""
+<Style name="ov-tenure">
+<Rule><PolygonSymbolizer fill="[col]" fill-opacity="0.32"/><LineSymbolizer stroke="[col]" stroke-opacity="0.85" stroke-width="0.5"/></Rule>
+</Style>
+<Style name="ov-tenure-labels">
+<Rule>&maxscale_zoom9;<TextSymbolizer fontset-name="sans-condensed-bold" size="9" fill="#ffffff" halo-radius="1.6" halo-fill="rgba(30,30,30,0.85)"
+ allow-overlap="true" avoid-edges="false" placement="point">[lbl]</TextSymbolizer></Rule>
+</Style>
+{layer("ov-tenure", ["ov-tenure"], TEN_SQL)}
+{layer("ov-tenure-labels", ["ov-tenure-labels"], TEN_LBL_SQL)}
+</Map>
+"""
+    (mapnik_dir / "overlay-tenure.xml").write_text(tenure_xml)
+    print("written: overlay-tenure.xml")

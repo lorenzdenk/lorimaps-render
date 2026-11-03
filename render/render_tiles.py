@@ -83,7 +83,8 @@ def render(tile):
                 rgba.save(buf, "WEBP", lossless=True)
             else:
                 q = rgba.quantize(colors=32, method=Image.Quantize.FASTOCTREE).convert("RGBA")
-                q.save(buf, "WEBP", lossless=True, quality=100, method=5)
+                # method 4: about 15 times faster than 5 on full tiles, only about 2 % larger
+                q.save(buf, "WEBP", lossless=True, quality=100, method=4)
         else:
             png.convert("RGB").save(buf, "WEBP", quality=quality, method=5)
         return z, x, y, buf.getvalue(), None

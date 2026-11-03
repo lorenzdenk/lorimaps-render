@@ -165,6 +165,14 @@ case " ${OVERLAYS:-} " in *" walks "*)
   bash "$HERE/data/import_walks.sh" ;;
 esac
 
+# ---------------------------------------------------------------- LIST land tenure for the access overlay (option)
+case " ${OVERLAYS:-} " in *" tenure "*)
+  step "Importing LIST land tenure (overlay)"
+  bash "$HERE/list/list_data.sh" "$WORK" "$BW" "$BS" "$BE" "$BN" land_tenure 26 "TEN_CLASS" gis list_tenure \
+    -nlt PROMOTE_TO_MULTI -lco SPATIAL_INDEX=GIST -makevalid
+  psql -d gis -At -c "SELECT 'land tenure: ' || count(*) || ' areas, ' || count(DISTINCT ten_class) || ' classes' FROM list_tenure;" ;;
+esac
+
 # ---------------------------------------------------------------- DEM
 step "Downloading Copernicus GLO-30 DEM"
 rm -rf "$WORK/dem-src"; mkdir -p "$WORK/dem-src"
