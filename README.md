@@ -130,7 +130,8 @@ neu gepatchten Stil – ideal, um am Stil zu feilen (TASVEG!). Geht nur, wenn de
   Dateigrösse; 60 ist von 75 nicht zu unterscheiden und etwa 14 % kleiner). `0` = wie `TILE_FORMAT`.
 - `WILD_MAXZOOM=15` – Wildnis nur bis Zoom 15 rendern (spart viel Platz; die App vergrössert dort Zoom 15).
   Wildnis = weiter als `WILD_ROAD_KM` (2) von jeder Strasse und weiter als `WILD_TRAIL_KM` (1) von jedem Pfad/Track
-  einer Tageswanderung (Pfadstück höchstens `WILD_HIKE_KM` (10) Luftlinie von einer Strasse). Leer = aus. Auch pro Region.
+  einer Tageswanderung (Pfadstück höchstens `WILD_HIKE_KM` (10) Luftlinie von einer Strasse; `0` = jeder Pfad/Track).
+  Leer = aus. Auch pro Region. Tasmanien: 0,5 / 1 / 0.
 - `GITHUB_SHARDS=8` – Anzahl paralleler GitHub-Rechner (gratis höchstens 20 gleichzeitig; jeder braucht
   ~10 min Vorbereitung, für kleine Gebiete also wenige nehmen). Auch pro Region setzbar.
 

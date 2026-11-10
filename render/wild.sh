@@ -4,7 +4,7 @@
 # Not wilderness is:
 #   - everything within WILD_ROAD_KM of a road (OSM and, if imported, LIST)
 #   - everything within WILD_TRAIL_KM of a path or track that a day walk reaches: the piece of path lies
-#     within WILD_HIKE_KM (straight line, one way) of a road
+#     within WILD_HIKE_KM (straight line, one way) of a road; WILD_HIKE_KM=0: every path and track
 # Usage: wild.sh <mid latitude of the map> ; distances from WILD_ROAD_KM, WILD_HIKE_KM, WILD_TRAIL_KM
 set -euo pipefail
 MIDLAT="$1"
@@ -39,7 +39,7 @@ CREATE TABLE wild_detail AS
   SELECT ST_Buffer(ST_Simplify(way, 30), :road, 2) AS way FROM wild_road
   UNION ALL
   SELECT ST_Buffer(ST_Simplify(t.way, 30), :trail, 2) FROM wild_trail t
-   WHERE EXISTS (SELECT 1 FROM wild_road r WHERE ST_DWithin(r.way, t.way, :hike));
+   WHERE :hike = 0 OR EXISTS (SELECT 1 FROM wild_road r WHERE ST_DWithin(r.way, t.way, :hike));
 CREATE INDEX ON wild_detail USING gist (way);
 ANALYZE wild_detail;
 SELECT 'wild: ' || (SELECT count(*) FROM wild_road) || ' roads, ' || (SELECT count(*) FROM wild_trail) || ' pieces of path, '
