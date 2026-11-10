@@ -3,8 +3,8 @@
 below the 2 GB release file limit: "<name>-part1of5.mbtiles" ... The app shows all parts of a map as one map.
 
 usage: pack_parts.py <stage release tag> <shard count> <out dir> <tmp dir>
-Needs gh (GH_TOKEN, GITHUB_REPOSITORY). Adjacent shards are merged greedily up to LIMIT bytes
-(identical tiles inside one part are stored once, so a part is never larger than the sum of its shards).
+Needs gh (GH_TOKEN, GITHUB_REPOSITORY). Every file is filled up to LIMIT bytes (a shard may continue in the next file), so there are as few files as possible;
+identical tiles inside one file are stored once.
 """
 import json
 import os
@@ -13,7 +13,9 @@ import sqlite3
 import subprocess
 import sys
 
-LIMIT = 1_900_000_000
+# release files may be 2 GiB (2 147 483 648 bytes); a batch of tiles is at most about 100 MB
+LIMIT = 2_020_000_000
+BATCH = 400   # tiles per step
 tag, shards, out_dir, tmp = sys.argv[1], int(sys.argv[2]), sys.argv[3], sys.argv[4]
 repo = os.environ["GITHUB_REPOSITORY"]
 os.makedirs(out_dir, exist_ok=True)
@@ -52,7 +54,11 @@ def close_db(db, path):
             map.tile_row AS tile_row, images.tile_data AS tile_data FROM map JOIN images ON images.tile_id = map.tile_id;""")
     db.commit()
     db.close()
-    print(f"  {os.path.basename(path)}: {os.path.getsize(path) / 1e9:.2f} GB", flush=True)
+
+
+def est_size(path, rows):
+    # file so far + the index on map that close_db() adds (about 30 bytes per tile)
+    return os.path.getsize(path) + 30 * rows
 
 
 for base, parts in sorted(groups.items()):
@@ -60,29 +66,44 @@ for base, parts in sorted(groups.items()):
     name = base if len(parts) == shards else base + "-INCOMPLETE"
     if len(parts) != shards:
         print(f"WARN: {base}: only {len(parts)} of {shards} shards", flush=True)
-    # greedy grouping of adjacent shards
-    packs, cur, size = [], [], 0
-    for p in parts:
-        if cur and size + p[2] > LIMIT:
-            packs.append(cur)
-            cur, size = [], 0
-        cur.append(p)
-        size += p[2]
-    if cur:
-        packs.append(cur)
-    print(f"{base}: {len(parts)} shards, {sum(p[2] for p in parts) / 1e9:.2f} GB -> {len(packs)} files", flush=True)
-    for k, pack in enumerate(packs, 1):
-        path = os.path.join(out_dir, f"{name}-part{k}of{len(packs)}.mbtiles")
-        db = None
-        for _, asset, _ in pack:
-            local = os.path.join(tmp, asset)
-            subprocess.run(["gh", "release", "download", tag, "-R", repo, "-p", asset, "-D", tmp, "--clobber"], check=True)
+    print(f"{base}: {len(parts)} shards, {sum(p[2] for p in parts) / 1e9:.2f} GB", flush=True)
+    # every file is filled up to LIMIT (a shard may continue in the next file), so there are as few files as possible
+    files, db, path, rows = [], None, None, 0
+    for _, asset, _ in parts:
+        local = os.path.join(tmp, asset)
+        subprocess.run(["gh", "release", "download", tag, "-R", repo, "-p", asset, "-D", tmp, "--clobber"], check=True)
+        src = sqlite3.connect(local)
+        last = src.execute("SELECT max(rowid) FROM map").fetchone()[0] or 0
+        src.close()
+        a, attached = 0, False
+        while a < last:
             if db is None:
+                path = os.path.join(out_dir, f"{name}-part{len(files) + 1}.tmp")
                 db = new_db(path, local)
-            db.execute("ATTACH DATABASE ? AS part", (local,))
-            db.execute("INSERT INTO map SELECT * FROM part.map")
-            db.execute("INSERT OR IGNORE INTO images SELECT * FROM part.images")
+                rows = 0
+            if not attached:
+                db.execute("ATTACH DATABASE ? AS part", (local,))
+                attached = True
+            b = a + BATCH
+            db.execute("INSERT INTO map SELECT * FROM part.map WHERE rowid > ? AND rowid <= ?", (a, b))
+            db.execute("INSERT OR IGNORE INTO images SELECT * FROM part.images WHERE tile_id IN "
+                       "(SELECT tile_id FROM part.map WHERE rowid > ? AND rowid <= ?)", (a, b))
             db.commit()
-            db.execute("DETACH DATABASE part")
-            os.remove(local)
+            rows += BATCH
+            a = b
+            if est_size(path, rows) > LIMIT:
+                db.execute("DETACH DATABASE part")
+                attached = False
+                close_db(db, path)
+                files.append(path)
+                db = None
+        if attached:
+            db.execute("DETACH DATABASE part")   # the next shard continues in this file
+        os.remove(local)
+    if db is not None:
         close_db(db, path)
+        files.append(path)
+    for k, f in enumerate(files, 1):
+        final = os.path.join(out_dir, f"{name}-part{k}of{len(files)}.mbtiles" if len(files) > 1 else f"{name}.mbtiles")
+        os.rename(f, final)
+        print(f"  {os.path.basename(final)}: {os.path.getsize(final) / 1e9:.2f} GB", flush=True)

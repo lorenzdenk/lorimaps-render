@@ -126,6 +126,11 @@ neu gepatchten Stil – ideal, um am Stil zu feilen (TASVEG!). Geht nur, wenn de
 - `MAGNIFY=2` – Linien, Symbole und Schrift doppelt so gross, gestochen scharf. Jede Zoomstufe zeigt dann
   den Inhalt der nächstkleineren Stufe (z14 sieht aus wie z13 vergrössert); für dieselben Details deshalb eine
   Zoomstufe mehr rendern (z.B. bis 17 statt 16). `MAGNIFY=1` = wie OpenTopoMap. Auch pro Region setzbar.
+- `HIGH_ZOOM_QUALITY=60`, `HIGH_ZOOM=16` – WebP-Qualität der Basiskarte ab Zoom 16 (dort liegt fast die ganze
+  Dateigrösse; 60 ist von 75 nicht zu unterscheiden und etwa 14 % kleiner). `0` = wie `TILE_FORMAT`.
+- `WILD_MAXZOOM=15` – Wildnis nur bis Zoom 15 rendern (spart viel Platz; die App vergrössert dort Zoom 15).
+  Wildnis = weiter als `WILD_ROAD_KM` (2) von jeder Strasse und weiter als `WILD_TRAIL_KM` (1) von jedem Pfad/Track
+  einer Tageswanderung (Pfadstück höchstens `WILD_HIKE_KM` (10) Luftlinie von einer Strasse). Leer = aus. Auch pro Region.
 - `GITHUB_SHARDS=8` – Anzahl paralleler GitHub-Rechner (gratis höchstens 20 gleichzeitig; jeder braucht
   ~10 min Vorbereitung, für kleine Gebiete also wenige nehmen). Auch pro Region setzbar.
 

@@ -402,6 +402,13 @@ else
   PART=""; [ "${SHARDS:-1}" -gt 1 ] && PART=".part$SHARD"
   # leave out open sea above zoom 11 (TASVEG covers all land of Tasmania)
   LAND_ARGS=""; [ "${TASVEG:-0}" = 1 ] && LAND_ARGS="--land-table tasveg --land-zoom 11"
+  # wilderness (far from roads and from paths of a day walk) only up to zoom WILD_MAXZOOM
+  if [ -n "${WILD_MAXZOOM:-}" ] && [ "$WILD_MAXZOOM" -lt "$MAXZOOM" ]; then
+    sub "Wilderness only up to zoom $WILD_MAXZOOM"
+    WILD_ROAD_KM="${WILD_ROAD_KM:-2}" WILD_HIKE_KM="${WILD_HIKE_KM:-10}" WILD_TRAIL_KM="${WILD_TRAIL_KM:-1}" \
+      bash "$HERE/wild.sh" "$(echo "($S + $N) / 2" | bc -l)"
+    LAND_ARGS="$LAND_ARGS --detail-table wild_detail --detail-zoom $WILD_MAXZOOM"
+  fi
   # GitHub jobs end after 6 hours: stop in time and keep the tiles (JOB_START is set by the workflow)
   BASE_DEADLINE=""; OV_DEADLINE=""
   if [ -n "${JOB_START:-}" ]; then
@@ -418,7 +425,8 @@ else
   python3 "$HERE/render_tiles.py" --shard "${SHARD:-0}" --shards "${SHARDS:-1}" \
     --style opentopomap.xml --out "$OUT/$NAME-otm$PART.mbtiles" \
     --bbox "$BBOX" --minzoom "$MINZOOM" --maxzoom "$MAXZOOM" --scale "$SCALE" --magnify "${MAGNIFY:-1}" \
-    --name "$TITLE" --processes "$(nproc)" --format "${TILE_FORMAT:-png8:m=h}" $LAND_ARGS $BASE_DEADLINE $FILL_ARGS
+    --name "$TITLE" --processes "$(nproc)" --format "${TILE_FORMAT:-png8:m=h}" \
+    --high-zoom-quality "${HIGH_ZOOM_QUALITY:-0}" --high-zoom "${HIGH_ZOOM:-16}" $LAND_ARGS $BASE_DEADLINE $FILL_ARGS
   fi
 fi
 

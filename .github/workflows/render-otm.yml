@@ -130,6 +130,17 @@ jobs:
             [ -f "$f" ] || continue
             case "$f" in *.part*.mbtiles) ;; *) mv "$f" out/ ;; esac
           done
+          # a map with some shards above and some below the staging size: the small ones follow to the temporary
+          # release, so pack_parts.py gets all shards of that map
+          if gh release view stage-${{ github.run_id }} -R "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            for b in $(gh release view stage-${{ github.run_id }} -R "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' | sed -n 's/\.part[0-9]*\.mbtiles$//p' | sort -u); do
+              for f in parts/"$b".part*.mbtiles; do
+                [ -f "$f" ] || continue
+                echo "staging small shard $f" | tee -a logs/merge.log
+                gh release upload stage-${{ github.run_id }} "$f" -R "$GITHUB_REPOSITORY" --clobber && rm "$f"
+              done
+            done
+          fi
           for base in $(ls parts/*.part*.mbtiles 2>/dev/null | sed 's/\.part[0-9]*\.mbtiles$//' | sort -u); do
             n=$(basename "$base")
             parts=$(ls "$base".part*.mbtiles | wc -l)

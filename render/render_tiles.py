@@ -73,6 +73,8 @@ def render(tile):
         # WebP via Pillow (lossy, quality after the colon, e.g. "webp:85")
         from PIL import Image
         quality = int(_args.format.split(":")[1]) if ":" in _args.format else 85
+        if _args.high_zoom_quality and z >= _args.high_zoom:
+            quality = _args.high_zoom_quality
         png = Image.open(io.BytesIO(im.tostring("png32")))
         buf = io.BytesIO()
         if _args.overlay:
@@ -101,6 +103,24 @@ def tiles_for(bbox, zmin, zmax):
                 yield z, x, y
 
 
+def tiles_touching(table, z, bbox, cond):
+    """Set of (x, y) tiles of zoom z in the bbox for which cond holds for a row t of the table (database gis);
+    {env} in cond is the tile's rectangle. None if the query fails (then nothing is left out)."""
+    import subprocess
+    x0, y0 = lonlat_to_tile(bbox[0], bbox[3], z)
+    x1, y1 = lonlat_to_tile(bbox[2], bbox[1], z)
+    env = ("ST_MakeEnvelope(-20037508.342789244 + x * s, 20037508.342789244 - (y + 1) * s, "
+           "-20037508.342789244 + (x + 1) * s, 20037508.342789244 - y * s, 3857)")
+    sql = (f"SELECT x || ',' || y FROM generate_series({x0},{x1}) x, generate_series({y0},{y1}) y, "
+           f"LATERAL (SELECT 40075016.68557849 / (1 << {z}) AS s) c "
+           f"WHERE EXISTS (SELECT 1 FROM {table} t WHERE {cond.format(env=env)})")
+    res = subprocess.run(["psql", "-d", "gis", "-At", "-c", sql], capture_output=True, text=True)
+    if res.returncode != 0:
+        print(f"WARN: tile filter on {table} failed: " + res.stderr.strip(), flush=True)
+        return None
+    return {tuple(map(int, l.split(","))) for l in res.stdout.split()}
+
+
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--style", required=True)
@@ -112,6 +132,9 @@ def main():
     p.add_argument("--magnify", type=float, default=1.0, help="draw lines, symbols and labels this much larger")
     p.add_argument("--overlay", action="store_true", help="transparent overlay (MBTiles type=overlay, tiles with alpha)")
     p.add_argument("--format", default="png8:m=h")
+    p.add_argument("--high-zoom-quality", type=int, default=0, help="WebP quality from zoom --high-zoom on "
+                   "(the highest levels are most of the file and are looked at enlarged least); 0 = as --format")
+    p.add_argument("--high-zoom", type=int, default=16)
     p.add_argument("--name", default="map")
     p.add_argument("--processes", type=int, default=os.cpu_count())
     p.add_argument("--shard", type=int, default=0, help="render only this part (0-based) ...")
@@ -120,6 +143,10 @@ def main():
                    "tiles above --land-zoom are only rendered inside land tiles of that zoom (open sea is left out; "
                    "the app enlarges the sea tile of the lower zoom level there)")
     p.add_argument("--land-zoom", type=int, default=11)
+    p.add_argument("--detail-table", default="", help="table in database gis with the areas that need all zoom levels "
+                   "(column way, see wild.sh): tiles above --detail-zoom are only rendered where they touch it "
+                   "(wilderness is left out; the app enlarges the tiles of --detail-zoom there)")
+    p.add_argument("--detail-zoom", type=int, default=15)
     p.add_argument("--deadline", type=float, default=0, help="stop at this time (seconds since 1970) and keep "
                    "what is rendered so far (GitHub ends jobs after 6 hours and the whole result would be lost)")
     p.add_argument("--skip", type=int, default=0, help="leave out the first SKIP tiles of the (shard's) list: "
@@ -135,23 +162,21 @@ def main():
     tiles = list(tiles_for(bbox, args.minzoom, args.maxzoom))
     if args.land_table and args.maxzoom > args.land_zoom:
         lz = args.land_zoom
-        x0, y0 = lonlat_to_tile(bbox[0], bbox[3], lz)
-        x1, y1 = lonlat_to_tile(bbox[2], bbox[1], lz)
-        sql = (f"SELECT x || ',' || y FROM generate_series({x0},{x1}) x, generate_series({y0},{y1}) y, "
-               f"LATERAL (SELECT 40075016.68557849 / (1 << {lz}) AS s) c "
-               f"WHERE EXISTS (SELECT 1 FROM {args.land_table} t WHERE t.way && ST_MakeEnvelope("
-               f"-20037508.342789244 + x * s, 20037508.342789244 - (y + 1) * s, "
-               f"-20037508.342789244 + (x + 1) * s, 20037508.342789244 - y * s, 3857))")
-        import subprocess
-        res = subprocess.run(["psql", "-d", "gis", "-At", "-c", sql], capture_output=True, text=True)
-        if res.returncode == 0:
-            land = {tuple(map(int, l.split(","))) for l in res.stdout.split()}
+        land = tiles_touching(args.land_table, lz, bbox, "t.way && {env}")
+        if land is not None:
             before = len(tiles)
             tiles = [t for t in tiles if t[0] <= lz or (t[1] >> (t[0] - lz), t[2] >> (t[0] - lz)) in land]
             print(f"land filter ({args.land_table}, zoom {lz}): {len(land)} land tiles, "
                   f"{before - len(tiles)} sea tiles left out", flush=True)
-        else:
-            print("WARN: land filter failed: " + res.stderr.strip(), flush=True)
+    if args.detail_table and args.maxzoom > args.detail_zoom:
+        dz = args.detail_zoom
+        detail = tiles_touching(args.detail_table, dz, bbox, "ST_Intersects(t.way, {env})")
+        if detail is not None:
+            before = len(tiles)
+            above = sum(1 for t in tiles if t[0] > dz)
+            tiles = [t for t in tiles if t[0] <= dz or (t[1] >> (t[0] - dz), t[2] >> (t[0] - dz)) in detail]
+            print(f"wilderness filter ({args.detail_table}, zoom {dz}): {len(detail)} tiles of zoom {dz} with detail, "
+                  f"{before - len(tiles)} of {above} tiles above zoom {dz} left out", flush=True)
     if args.shards > 1:
         # blocks of 8x8 tiles stay together (shared database pages and caches)
         tiles = [t for t in tiles if ((t[1] >> 3) * 7919 + (t[2] >> 3) * 104729 + t[0]) % args.shards == args.shard]
