@@ -1,0 +1,11 @@
+render jobs: success
+merging tasmania-z17-boomgates: 4 of 4 parts
+merged parts/tasmania-z17-boomgates.part0.mbtiles
+merged parts/tasmania-z17-boomgates.part1.mbtiles
+merged parts/tasmania-z17-boomgates.part2.mbtiles
+merged parts/tasmania-z17-boomgates.part3.mbtiles
+out/tasmania-z17-boomgates.mbtiles: 382774 tiles, 4028 unique images, 28.1 MB
+total 27472
+drwxr-xr-x 2 runner root       4096 Nov 19 14:50 .
+drwxr-xr-x 4 root   root       4096 Nov 19 14:50 ..
+-rw-r--r-- 1 runner runner 28123136 Nov 19 14:50 tasmania-z17-boomgates.mbtiles
