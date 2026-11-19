@@ -173,6 +173,19 @@ case " ${OVERLAYS:-} " in *" tenure "*)
   psql -d gis -At -c "SELECT 'land tenure: ' || count(*) || ' areas, ' || count(DISTINCT ten_class) || ' classes' FROM list_tenure;" ;;
 esac
 
+# ---------------------------------------------------------------- boom gates for the boomgates overlay (option)
+# render/data/boomgates.gpx: waypoints only (LIST Transport Nodes, TNODE_FEAT = Boom Gate)
+case " ${OVERLAYS:-} " in *" boomgates "*)
+  step "Importing boom gates (overlay)"
+  ogr2ogr -f PostgreSQL PG:dbname=gis "$HERE/data/boomgates.gpx" waypoints -nln boomgates -overwrite \
+    -t_srs EPSG:3857 -lco GEOMETRY_NAME=way
+  # 1.5 km around each gate: tiles above zoom 11 are only rendered there (the symbol reaches into neighbouring tiles)
+  psql -q -v ON_ERROR_STOP=1 -d gis -c "DROP TABLE IF EXISTS boomgates_area;
+    CREATE TABLE boomgates_area AS SELECT ST_Buffer(way, 1500) AS way FROM boomgates;
+    CREATE INDEX ON boomgates_area USING gist (way);"
+  psql -d gis -At -c "SELECT 'boom gates: ' || count(*) FROM boomgates;" ;;
+esac
+
 # ---------------------------------------------------------------- DEM
 step "Downloading Copernicus GLO-30 DEM"
 rm -rf "$WORK/dem-src"; mkdir -p "$WORK/dem-src"
@@ -435,10 +448,13 @@ fi
     step "Rendering overlay $ov"
     # own highest zoom per overlay (OVERLAY_MAXZOOM_<name>); the app enlarges the last level beyond it
     omz_var="OVERLAY_MAXZOOM_$ov"; omz=${!omz_var:-$MAXZOOM}; [ "$omz" -gt "$MAXZOOM" ] && omz=$MAXZOOM
+    OV_ARGS="$LAND_ARGS"
+    # boom gates: above zoom 11 only the tiles near a gate (everything else is empty)
+    [ "$ov" = boomgates ] && OV_ARGS="--land-table boomgates_area --land-zoom 11 --detail-table boomgates_area --detail-zoom 13"
     python3 "$HERE/render_tiles.py" --shard "${SHARD:-0}" --shards "${SHARDS:-1}" --overlay \
       --style "overlay-$ov.xml" --out "$OUT/$NAME-$ov$PART.mbtiles" \
       --bbox "$BBOX" --minzoom "$MINZOOM" --maxzoom "$omz" --scale "$SCALE" --magnify "${MAGNIFY:-1}" \
-      --name "$TITLE – $ov" --processes "$(nproc)" --format "${TILE_FORMAT:-png8:m=h}" $LAND_ARGS $OV_DEADLINE
+      --name "$TITLE – $ov" --processes "$(nproc)" --format "${TILE_FORMAT:-png8:m=h}" $OV_ARGS $OV_DEADLINE
   done
 # example spots (TASVEG) for the check images of the workflow
 [ -f "$WORK/tasveg/sample_points.txt" ] && cp "$WORK/tasveg/sample_points.txt" "$OUT/samples-$NAME-otm.txt"
