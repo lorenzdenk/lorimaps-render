@@ -702,14 +702,13 @@ if "tenure" in os.environ.get("OVERLAYS", "").split():
 
 # ---------------------------------------------------------------- boom gates overlay (OVERLAYS contains "boomgates")
 # Points of render/data/boomgates.gpx (LIST Transport Nodes, TNODE_FEAT = Boom Gate, (c) State of Tasmania, CC BY 3.0 AU),
-# symbol only (red "no entry" disc as for locked gates in the map), no label.
-# Shown from zoom 12: rule zoom = shown zoom - 1 with MAGNIFY=2 (all maps are rendered with MAGNIFY=2).
+# purple dot only, no label.
+# Shown from zoom 14: rule zoom = shown zoom - 1 with MAGNIFY=2 (all maps are rendered with MAGNIFY=2).
 if "boomgates" in os.environ.get("OVERLAYS", "").split():
     GATES_OV_SQL = "(SELECT way FROM boomgates WHERE way && !bbox!) AS bg"
     boomgates_xml = OVERLAY_HEAD + f"""
 <Style name="ov-boomgates">
-<Rule>&maxscale_zoom11;&minscale_zoom12;<PointSymbolizer file="symbols-otm/gate_locked.svg" transform="scale(0.8)" allow-overlap="true" ignore-placement="true"/></Rule>
-<Rule>&maxscale_zoom13;<PointSymbolizer file="symbols-otm/gate_locked.svg" allow-overlap="true" ignore-placement="true"/></Rule>
+<Rule>&maxscale_zoom13;<MarkersSymbolizer marker-type="ellipse" width="5" height="5" fill="#8e24aa" stroke="#ffffff" stroke-width="0.6" allow-overlap="true" ignore-placement="true"/></Rule>
 </Style>
 {layer("ov-boomgates", ["ov-boomgates"], GATES_OV_SQL)}
 </Map>
